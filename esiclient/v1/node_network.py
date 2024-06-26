@@ -45,9 +45,15 @@ class List(command.Lister):
     def take_action(self, parsed_args):
         self.log.debug("take_action(%s)", parsed_args)
 
-        return node.network_list(self.app.client_manager.sdk_connection,
-                                 parsed_args.node,
-                                 parsed_args.network)
+        node_networks = node.network_list(
+            self.app.client_manager.sdk_connection,
+            parsed_args.node,
+            parsed_args.network
+        )
+
+        return ["Node", "MAC Address", "Port", "Network", "Fixed IP",
+                "Floating Network", "Floating IP"], [
+                    node_network.values() for node_network in node_networks]
 
 
 class Attach(command.ShowOne):
