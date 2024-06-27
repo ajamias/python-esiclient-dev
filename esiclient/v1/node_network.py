@@ -51,9 +51,30 @@ class List(command.Lister):
             parsed_args.network
         )
 
+        data = []
+        for node_network in node_networks:
+            for node_port in node_network['node_ports']:
+                floating_network_ids = [f_ip.floating_network_id 
+                    for f_ip in node_port['floating_ips']
+                    if f_ip.port_id == node_port['network_port'].id
+                ]
+                data.append([
+                    node_network['node'].name,
+                    node_port['baremetal_port'].address,
+                    node_port['network_port'].name,
+                    '\n'.join(["%s (%s)" % (network.name, network.provider_segmentation_id)
+                        for network in [node_port['networks']['parent'],
+                        node_port['networks']['trunk']] if network is not None]),
+                    '\n'.join([fixed_ip['ip_address']
+                        for fixed_ip in node_port['network_port'].fixed_ips]),
+                    '\n'.join([network.name
+                        for network in node_port['networks']['floating']]),
+                    '\n'.join([f_ip.floating_ip_address
+                        for f_ip in node_port['floating_ips']])
+                ])
+
         return ["Node", "MAC Address", "Port", "Network", "Fixed IP",
-                "Floating Network", "Floating IP"], [
-                    node_network.values() for node_network in node_networks]
+                "Floating Network", "Floating IP"], data
 
 
 class Attach(command.ShowOne):
