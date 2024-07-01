@@ -63,6 +63,10 @@ class List(command.Lister):
                         if network is not None
                     ]
 
+                    fixed_ips_display = [','.join([
+                        ip['ip_address'] for ip in port.fixed_ips])
+                        for port in node_port['network_ports']]
+
                     if node_port['networks']['floating']:
                         floating_network_display = \
                             utils.get_network_display_name(
@@ -72,27 +76,25 @@ class List(command.Lister):
                             pfwd.internal_port,
                             pfwd.external_port)
                             for pfwd in node_port['port_forwardings']]
-                        floating_ip_display = '%s (%s)' % (
-                            node_port['floating_ip'].floating_ip_address,
-                            ','.join(pfwd_ports)
-                        )
+
+                        floating_ip_display = node_port['floating_ip'].floating_ip_address
+                        if len(pfwd_ports):
+                            floating_ip_display += ' (%s)' % ','.join(pfwd_ports)
                     else:
                         floating_network_display = None
                         floating_ip_display = None
                 else:
                     network_names_display = []
+                    fixed_ips_display = []
                     floating_network_display = None
                     floating_ip_display = None
 
                 data.append([
                     node_network['node'].name,
                     node_port['baremetal_port'].address,
-                    getattr(node_port['network_port'], 'name', None),
+                    getattr(node_port['network_ports'][0], 'name', None),
                     '\n'.join(network_names_display) or None,
-                    '\n'.join([fixed_ip['ip_address'] for fixed_ip
-                               in getattr(node_port['network_port'],
-                                          'fixed_ips',
-                                          [])]) or None,
+                    '\n'.join(fixed_ips_display) or None,
                     floating_network_display,
                     floating_ip_display,
                 ])
