@@ -16,7 +16,7 @@ from osc_lib.command import command
 from osc_lib import exceptions
 from osc_lib.i18n import _
 
-from esi.lib import node
+from esi.lib import nodes
 
 from esiclient import utils
 
@@ -44,8 +44,7 @@ class List(command.Lister):
 
     def take_action(self, parsed_args):
         self.log.debug("take_action(%s)", parsed_args)
-
-        node_networks = node.network_list(
+        node_networks = nodes.network_list(
             self.app.client_manager.sdk_connection,
             parsed_args.node,
             parsed_args.network
@@ -53,26 +52,50 @@ class List(command.Lister):
 
         data = []
         for node_network in node_networks:
-            for node_port in node_network['node_ports']:
-                floating_network_ids = [f_ip.floating_network_id 
-                    for f_ip in node_port['floating_ips']
-                    if f_ip.port_id == node_port['network_port'].id
-                ]
+            for node_port in node_network['network_info']:
+                if node_port['networks']:
+                    parent_network = node_port['networks']['parent']
+                    trunk_networks = node_port['networks']['trunk'] or []
+
+                    network_names_display = [
+                        utils.get_network_display_name(network)
+                        for network in [parent_network] + trunk_networks
+                        if network is not None
+                    ]
+
+                    if node_port['networks']['floating']:
+                        floating_network_display = \
+                            utils.get_network_display_name(
+                                node_port['networks']['floating'])
+
+                        pfwd_ports = ['%s:%s' % (
+                            pfwd.internal_port,
+                            pfwd.external_port)
+                            for pfwd in node_port['port_forwardings']]
+                        floating_ip_display = '%s (%s)' % (
+                            node_port['floating_ip'].floating_ip_address,
+                            ','.join(pfwd_ports)
+                        )
+                    else:
+                        floating_network_display = None
+                        floating_ip_display = None
+                else:
+                    network_names_display = []
+                    floating_network_display = None
+                    floating_ip_display = None
+
                 data.append([
                     node_network['node'].name,
                     node_port['baremetal_port'].address,
-                    node_port['network_port'].name,
-                    '\n'.join(["%s (%s)" % (network.name, network.provider_segmentation_id)
-                        for network in [node_port['networks']['parent'],
-                        node_port['networks']['trunk']] if network is not None]),
-                    '\n'.join([fixed_ip['ip_address']
-                        for fixed_ip in node_port['network_port'].fixed_ips]),
-                    '\n'.join([network.name
-                        for network in node_port['networks']['floating']]),
-                    '\n'.join([f_ip.floating_ip_address
-                        for f_ip in node_port['floating_ips']])
+                    getattr(node_port['network_port'], 'name', None),
+                    '\n'.join(network_names_display) or None,
+                    '\n'.join([fixed_ip['ip_address'] for fixed_ip
+                               in getattr(node_port['network_port'],
+                                          'fixed_ips',
+                                          [])]) or None,
+                    floating_network_display,
+                    floating_ip_display,
                 ])
-
         return ["Node", "MAC Address", "Port", "Network", "Fixed IP",
                 "Floating Network", "Floating IP"], data
 
