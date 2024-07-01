@@ -53,51 +53,57 @@ class List(command.Lister):
         data = []
         for node_network in node_networks:
             for node_port in node_network['network_info']:
+                node_name = node_network['node'].name
+                mac_address = node_port['baremetal_port'].address
+
+                network_port_name = None
+                network_names = None
+                fixed_ips = None
+                floating_network = None
+                floating_ip = None
+
                 if node_port['networks']:
+                    if len(node_port['network_ports']):
+                        network_port_name = getattr(
+                            node_port['network_ports'][0], 'name')
+
                     parent_network = node_port['networks']['parent']
                     trunk_networks = node_port['networks']['trunk'] or []
 
-                    network_names_display = [
+                    network_names = '\n'.join([
                         utils.get_network_display_name(network)
                         for network in [parent_network] + trunk_networks
                         if network is not None
-                    ]
+                    ]) or None
 
-                    fixed_ips_display = [','.join([
+                    fixed_ips = '\n'.join([','.join([
                         ip['ip_address'] for ip in port.fixed_ips])
-                        for port in node_port['network_ports']]
+                        for port in node_port['network_ports']])
 
                     if node_port['networks']['floating']:
-                        floating_network_display = \
-                            utils.get_network_display_name(
-                                node_port['networks']['floating'])
+                        floating_network = utils.get_network_display_name(
+                            node_port['networks']['floating'])
 
                         pfwd_ports = ['%s:%s' % (
                             pfwd.internal_port,
                             pfwd.external_port)
                             for pfwd in node_port['port_forwardings']]
 
-                        floating_ip_display = node_port['floating_ip'].floating_ip_address
+                        floating_ip = \
+                            node_port['floating_ip'].floating_ip_address
                         if len(pfwd_ports):
-                            floating_ip_display += ' (%s)' % ','.join(pfwd_ports)
-                    else:
-                        floating_network_display = None
-                        floating_ip_display = None
-                else:
-                    network_names_display = []
-                    fixed_ips_display = []
-                    floating_network_display = None
-                    floating_ip_display = None
+                            floating_ip += ' (%s)' % ','.join(pfwd_ports)
 
                 data.append([
-                    node_network['node'].name,
-                    node_port['baremetal_port'].address,
-                    getattr(node_port['network_ports'][0], 'name', None),
-                    '\n'.join(network_names_display) or None,
-                    '\n'.join(fixed_ips_display) or None,
-                    floating_network_display,
-                    floating_ip_display,
+                    node_name,
+                    mac_address,
+                    network_port_name,
+                    network_names,
+                    fixed_ips,
+                    floating_network,
+                    floating_ip,
                 ])
+
         return ["Node", "MAC Address", "Port", "Network", "Fixed IP",
                 "Floating Network", "Floating IP"], data
 
